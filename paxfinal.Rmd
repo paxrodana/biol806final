@@ -1,0 +1,126 @@
+---
+title: "Changes in cladoceran communities at Lake Varese over time"
+author: "Pax"
+date: "12/8/2021"
+output: pdf_document
+bibliography: bruelet.bib
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(vegan)
+library(ggplot2)
+library(viridisLite)
+library(bibtex)
+
+```
+
+For this project, I am working with a dataset of cladoceran species over time at Lake Varese, Italy. This is a paleoecological dataset; samples came from a sediment core taken from the deepest area of Lake Varese, and cladoceran remains throughout the core were identified to either the species or genus level depending on taxonomic complexity. (Bruel et al., 2018).
+
+Lake Varese is an ecologically interesting study site because of how human management has changed over time. After World War II ended in 1945, more Italians migrated to the northwest, where Lake Varese is located, and beginning in the 1950s, inputs of phosphorus (P) in the surrounding area has caused hypereutrophication of the lake. This continued unchecked until a water quality law in 1976 was passed to curb inputs of P and other chemicals into bodies of water in Italy.
+
+Step 1: learn how to join things, reformat dataframes, which was missed while out sick. Code chunk below represents way more time than one would hope...
+
+```{r import, echo=FALSE}
+lakeplank <- read.delim("~/Documents/BIOL806/data/lakeplank.txt")
+
+#calculate species richness
+
+richness <- ddply(lakeplank,~AGE,function(x) {
++   data.frame(richness=sum(x[-1]>0))
+ })
+
+# add to new dataframe with species indicators
+lakeindic <- left_join(lakeplank, richness, by = c("AGE" = "AGE"))
+
+#calculate simpson's D
+simpson <- ddply(lakeplank,~AGE,function(x) {
++   data.frame(SIMPSON=diversity(x[-1], index="simpson"))
+ })
+
+#add to df
+lakeindic <- left_join(lakeindic, simpson, by = c("AGE" = "AGE"))
+
+#calculate shannon
+shannon <- ddply(lakeplank,~AGE,function(x) {
++   data.frame(SHANNON=diversity(x[-1], index="shannon"))
+ })
+
+#add to df
+lakeindic <- left_join(lakeindic, shannon, by = c("AGE" = "AGE"))
+
+# make this df loooong (probably should have been step one)
+lake_long <- gather(lakeindic, species, measurement, L..kindti:P..pigra, factor_key=TRUE)
+
+```
+
+Goal #1: Look at the change in species richness under time. Expecting it will tank around 1950 after WWII.
+
+```{r richnesschange, fig.cap = "Cladoceran species richness at Lake Varese between 1837 and 2008.", echo=FALSE}
+richnesschange <- ggplot(data=lake_long, aes(x=AGE, y=richness)) +
+  geom_line() +
+  theme_classic() +
+  xlab("Year") + (ylab("Species richness"))
+
+richnesschange
+
+```
+
+Goal #2: Find way to visualize change in diversity of a population. Not currently very meaningful, needs context.
+
+```{r diversitychange, echo=FALSE}
+diversitychange <- ggplot(data=lake_long, aes(x=AGE, y=SHANNON)) +
+  geom_line() +
+  theme_minimal() +
+  xlab("Year") + (ylab("Shannon diversity index"))
+
+diversitychange
+
+```
+Goal #3: Learn how to make a stacked bar chart that shows the different species over time.
+
+```{r bar graph stacking species, echo=FALSE}
+specieschart <- ggplot(data=lake_long, aes(x=AGE, y=measurement, fill=species)) +
+  geom_bar(stat="identity") +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  xlab("Year") + (ylab("Species composition")) +
+  guides(fill = guide_legend(title = "Species")) 
+
+specieschart
+
+```
+
+Goal #4: Return to quest of learning how to make multipanel figures that don't suck. This one is not yet that.
+
+``` {r species_time, fig.height = 10, fig.width = 10.5, fig.cap = "Species", echo = FALSE}
+
+# axes = free
+specieschange <- ggplot(data = lake_long, mapping = aes(x = AGE, y = measurement)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = 'Year', y = 'Measurement') + 
+  facet_wrap( ~ species, scales="free_y") +
+  theme(axis.text.y = element_text(size = 10)) +
+  theme(axis.text.x = element_text(angle = 90))
+
+specieschange
+```
+
+Potential next steps:
+- Make a multipanel figure like above, but focused on the species whose populations changed most at the ~1950 inflection point. Possibly learn to change scale for different panels? Normalize species data?
+- Do something interesting with visualizing diversity indices.
+- Figure out how to make species composition bar chart more legible based on color, if possible.
+- Combine stacked bar chart with one or more community composition indicators?
+- Pick out most dramatic species to look at in more detail?
+
+# References
+```{r generaterefs, results="asis", echo=FALSE}
+options("citation_format" = "pandoc")
+read.bib(file = "bruelet.bib")
+``` 
